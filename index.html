@@ -11,6 +11,7 @@ body{
     overflow:hidden;
     background:#020502;
     font-family:Courier New, monospace;
+    touch-action:none;
 }
 
 canvas{
@@ -58,6 +59,59 @@ canvas{
     color:white;
     padding:10px 20px;
     border-radius:5px;
+    text-align:center;
+}
+
+/* MOBILE CONTROLS */
+
+#joystickBase{
+    position:absolute;
+    bottom:40px;
+    left:40px;
+    width:120px;
+    height:120px;
+    border-radius:50%;
+    background:rgba(255,255,255,0.12);
+    border:2px solid rgba(255,255,255,0.25);
+    touch-action:none;
+}
+
+#joystickStick{
+    position:absolute;
+    width:50px;
+    height:50px;
+    left:35px;
+    top:35px;
+    border-radius:50%;
+    background:rgba(255,255,255,0.45);
+}
+
+#shootBtn{
+    position:absolute;
+    right:40px;
+    bottom:60px;
+    width:90px;
+    height:90px;
+    border-radius:50%;
+    border:none;
+    background:#aa2222;
+    color:white;
+    font-size:20px;
+    font-weight:bold;
+}
+
+#sprintBtn{
+    position:absolute;
+    right:150px;
+    bottom:90px;
+    width:70px;
+    height:70px;
+    border-radius:50%;
+    border:none;
+    background:#2288ff;
+    color:white;
+    font-size:14px;
+    font-weight:bold;
 }
 </style>
 </head>
@@ -73,12 +127,20 @@ canvas{
 <div id="health">Health: 100</div>
 
 <div id="instructions">
-WASD = Move |
-SHIFT = Sprint |
-Mouse = Aim |
-Click = Shoot |
-Cabin heals you slowly
+WASD or Joystick = Move<br>
+SHIFT or Sprint Button = Sprint<br>
+Mouse or Touch = Aim<br>
+Click or Shoot Button = Shoot
 </div>
+
+<!-- MOBILE CONTROLS -->
+
+<div id="joystickBase">
+    <div id="joystickStick"></div>
+</div>
+
+<button id="shootBtn">SHOOT</button>
+<button id="sprintBtn">SPRINT</button>
 
 <canvas id="gameCanvas"></canvas>
 
@@ -123,6 +185,29 @@ const mouse = {
     y: canvas.height / 2
 };
 
+// ================= MOBILE =================
+
+const joystickBase =
+    document.getElementById("joystickBase");
+
+const joystickStick =
+    document.getElementById("joystickStick");
+
+const shootBtn =
+    document.getElementById("shootBtn");
+
+const sprintBtn =
+    document.getElementById("sprintBtn");
+
+let joystickActive = false;
+
+let joystickData = {
+    x:0,
+    y:0
+};
+
+let mobileSprint = false;
+
 // ================= STAMINA =================
 
 let stamina = 100;
@@ -165,7 +250,7 @@ const cabin = {
     height:150
 };
 
-// ================= WORLD GENERATION =================
+// ================= WORLD =================
 
 function generateWorld(){
 
@@ -252,7 +337,7 @@ setInterval(() => {
 
 },1000);
 
-// ================= INPUT =================
+// ================= KEYBOARD =================
 
 window.addEventListener("keydown", e => {
     keys[e.key.toLowerCase()] = true;
@@ -262,15 +347,75 @@ window.addEventListener("keyup", e => {
     keys[e.key.toLowerCase()] = false;
 });
 
+// ================= MOUSE =================
+
 window.addEventListener("mousemove", e => {
 
     mouse.x = e.clientX;
     mouse.y = e.clientY;
 });
 
+// ================= JOYSTICK =================
+
+joystickBase.addEventListener("touchstart", () => {
+
+    joystickActive = true;
+});
+
+joystickBase.addEventListener("touchmove", e => {
+
+    e.preventDefault();
+
+    const touch = e.touches[0];
+
+    const rect =
+        joystickBase.getBoundingClientRect();
+
+    const centerX =
+        rect.left + rect.width / 2;
+
+    const centerY =
+        rect.top + rect.height / 2;
+
+    let dx = touch.clientX - centerX;
+    let dy = touch.clientY - centerY;
+
+    const dist =
+        Math.sqrt(dx*dx + dy*dy);
+
+    const maxDist = 40;
+
+    if(dist > maxDist){
+
+        dx = (dx / dist) * maxDist;
+        dy = (dy / dist) * maxDist;
+    }
+
+    joystickStick.style.left =
+        `${35 + dx}px`;
+
+    joystickStick.style.top =
+        `${35 + dy}px`;
+
+    joystickData.x = dx / maxDist;
+    joystickData.y = dy / maxDist;
+
+});
+
+joystickBase.addEventListener("touchend", () => {
+
+    joystickActive = false;
+
+    joystickData.x = 0;
+    joystickData.y = 0;
+
+    joystickStick.style.left = "35px";
+    joystickStick.style.top = "35px";
+});
+
 // ================= SHOOT =================
 
-window.addEventListener("mousedown", () => {
+function shoot(){
 
     if(gameOver) return;
     if(isDaytime) return;
@@ -295,7 +440,27 @@ window.addEventListener("mousedown", () => {
     if(ammo <= 0){
         startReload();
     }
+}
+
+window.addEventListener("mousedown", shoot);
+
+shootBtn.addEventListener("touchstart", e => {
+
+    e.preventDefault();
+    shoot();
 });
+
+// ================= SPRINT =================
+
+sprintBtn.addEventListener("touchstart", () => {
+    mobileSprint = true;
+});
+
+sprintBtn.addEventListener("touchend", () => {
+    mobileSprint = false;
+});
+
+// ================= RELOAD =================
 
 function startReload(){
 
@@ -352,7 +517,8 @@ function update(){
     // ===== SPRINT =====
 
     let sprinting =
-        keys["shift"] && stamina > 0;
+        (keys["shift"] || mobileSprint)
+        && stamina > 0;
 
     let speed =
         sprinting ? 5.5 : 3;
@@ -394,19 +560,38 @@ function update(){
     let moveX = 0;
     let moveY = 0;
 
+    // KEYBOARD
+
     if(keys["w"]) moveY -= speed;
     if(keys["s"]) moveY += speed;
     if(keys["a"]) moveX -= speed;
     if(keys["d"]) moveX += speed;
 
+    // JOYSTICK
+
+    moveX += joystickData.x * speed;
+    moveY += joystickData.y * speed;
+
     player.x += moveX;
     player.y += moveY;
 
-    player.angle =
-        Math.atan2(
-            mouse.y - canvas.height / 2,
-            mouse.x - canvas.width / 2
+    // AIM
+
+    if(joystickActive){
+
+        player.angle = Math.atan2(
+            joystickData.y,
+            joystickData.x
         );
+
+    }else{
+
+        player.angle =
+            Math.atan2(
+                mouse.y - canvas.height / 2,
+                mouse.x - canvas.width / 2
+            );
+    }
 
     // ===== CABIN =====
 
@@ -518,8 +703,6 @@ function update(){
         let dist =
             Math.sqrt(dx*dx + dy*dy);
 
-        // DAMAGE PLAYER
-
         if(dist < player.size + 6 &&
            !protectedByCabin){
 
@@ -531,8 +714,6 @@ function update(){
                 return;
             }
         }
-
-        // CABIN
 
         let monsterInsideCabin =
             m.x > cabin.x &&
@@ -605,8 +786,7 @@ function update(){
     // ===== UI =====
 
     document.getElementById("stamina").innerText =
-        "Stamina: " +
-        Math.floor(stamina);
+        "Stamina: " + Math.floor(stamina);
 
     document.getElementById("ammo").innerText =
         reloading
@@ -615,17 +795,14 @@ function update(){
 
     document.getElementById("battery").innerText =
         "Flashlight Battery: " +
-        Math.floor(flashlightBattery) +
-        "%";
+        Math.floor(flashlightBattery) + "%";
 
     document.getElementById("safeTimer").innerText =
         "Cabin Safety: " +
-        player.safeTimer.toFixed(1) +
-        "s";
+        player.safeTimer.toFixed(1) + "s";
 
     document.getElementById("health").innerText =
-        "Health: " +
-        Math.floor(health);
+        "Health: " + Math.floor(health);
 }
 
 // ================= DRAW =================
