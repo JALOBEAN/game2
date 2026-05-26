@@ -6,102 +6,76 @@
 <title>99 Nights in the Forest</title>
 
 <style>
-
-body {
-    margin: 0;
-    overflow: hidden;
-    background: #020502;
-    font-family: "Courier New", monospace;
+body{
+    margin:0;
+    overflow:hidden;
+    background:#020502;
+    font-family:Courier New, monospace;
 }
 
-canvas {
-    display: block;
+canvas{
+    display:block;
 }
 
-#ui {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    color: #ff3333;
-    font-size: 24px;
-    font-weight: bold;
+#ui{
+    position:absolute;
+    top:20px;
+    left:20px;
+    color:#ff3333;
+    font-size:24px;
+    font-weight:bold;
 }
 
-#timer {
-    position: absolute;
-    top: 60px;
-    left: 20px;
-    color: white;
-    font-size: 18px;
-    font-weight: bold;
+#timer{
+    position:absolute;
+    top:60px;
+    left:20px;
+    color:white;
+    font-size:18px;
 }
 
-#stamina {
-    position: absolute;
-    top: 95px;
-    left: 20px;
-    color: #00ccff;
-    font-size: 18px;
-    font-weight: bold;
+#stamina{
+    position:absolute;
+    top:90px;
+    left:20px;
+    color:#00ccff;
+    font-size:18px;
 }
 
-#ammo {
-    position: absolute;
-    top: 125px;
-    left: 20px;
-    color: #ffee66;
-    font-size: 18px;
-    font-weight: bold;
+#ammo{
+    position:absolute;
+    top:120px;
+    left:20px;
+    color:#ffee66;
+    font-size:18px;
 }
 
-#battery {
-    position: absolute;
-    top: 155px;
-    left: 20px;
-    color: #ffff88;
-    font-size: 18px;
-    font-weight: bold;
+#battery{
+    position:absolute;
+    top:150px;
+    left:20px;
+    color:#ffff88;
+    font-size:18px;
 }
 
-#inventory {
-    position: absolute;
-    top: 185px;
-    left: 20px;
-    color: #88ff88;
-    font-size: 18px;
-    font-weight: bold;
+#safeTimer{
+    position:absolute;
+    top:180px;
+    left:20px;
+    color:#66ffcc;
+    font-size:18px;
 }
 
-#safeTimer {
-    position: absolute;
-    top: 215px;
-    left: 20px;
-    color: #66ffcc;
-    font-size: 18px;
-    font-weight: bold;
+#instructions{
+    position:absolute;
+    bottom:20px;
+    left:50%;
+    transform:translateX(-50%);
+    background:rgba(0,0,0,0.7);
+    color:white;
+    padding:10px 20px;
+    border-radius:5px;
 }
-
-#eventText {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    color: red;
-    font-size: 28px;
-    font-weight: bold;
-}
-
-#instructions {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    color: white;
-    background: rgba(0,0,0,0.7);
-    padding: 10px 20px;
-    border-radius: 5px;
-    text-align: center;
-}
-
 </style>
 </head>
 
@@ -112,17 +86,13 @@ canvas {
 <div id="stamina">Stamina: 100</div>
 <div id="ammo">Darts: 5 / 5</div>
 <div id="battery">Flashlight Battery: 100%</div>
-<div id="inventory">Medkits: 1 | Batteries: 1</div>
 <div id="safeTimer">Cabin Safety: 5s</div>
-<div id="eventText"></div>
 
 <div id="instructions">
 WASD = Move |
 SHIFT = Sprint |
 Mouse = Aim |
 Click = Shoot |
-F = Battery |
-Q = Medkit |
 Cabin protects for 5 seconds
 </div>
 
@@ -133,13 +103,12 @@ Cabin protects for 5 seconds
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-function resize() {
+function resize(){
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 }
 
 resize();
-
 window.addEventListener("resize", resize);
 
 // ================= GAME =================
@@ -149,9 +118,6 @@ let isDaytime = false;
 let timeRemaining = 30;
 let gameOver = false;
 
-let bloodMoon = false;
-let fogNight = false;
-
 // ================= PLAYER =================
 
 const player = {
@@ -159,7 +125,7 @@ const player = {
     y: canvas.height / 2,
     size: 8,
     angle: 0,
-    safeTimer: 0
+    safeTimer: 5
 };
 
 // ================= INPUT =================
@@ -171,15 +137,15 @@ const mouse = {
     y: canvas.height / 2
 };
 
-// ================= STATS =================
+// ================= STAMINA =================
 
 let stamina = 100;
-let flashlightBattery = 100;
-
 const MAX_STAMINA = 100;
-const MAX_BATTERY = 100;
 
 // ================= FLASHLIGHT =================
+
+let flashlightBattery = 100;
+const MAX_BATTERY = 100;
 
 const FLASHLIGHT_RANGE = 300;
 const FLASHLIGHT_ANGLE_HALF = Math.PI / 6;
@@ -193,16 +159,10 @@ const MAX_AMMO = 5;
 
 let reloading = false;
 
-// ================= INVENTORY =================
-
-let batteryPacks = 1;
-let medkits = 1;
-
 // ================= WORLD =================
 
 const trees = [];
 let monsters = [];
-let pickups = [];
 
 // ================= CABIN =================
 
@@ -213,70 +173,34 @@ const cabin = {
     height: 150
 };
 
-// ================= WORLD GENERATION =================
+// ================= WORLD =================
 
-function generateWorld() {
+function generateWorld(){
 
     trees.length = 0;
 
-    for (let i = 0; i < 120; i++) {
+    for(let i = 0; i < 120; i++){
 
         trees.push({
-            x: (Math.random() - 0.5) * 3000,
-            y: (Math.random() - 0.5) * 3000,
-            radius: Math.random() * 15 + 10
+            x:(Math.random()-0.5)*3000,
+            y:(Math.random()-0.5)*3000,
+            radius:Math.random()*15+10
         });
     }
 
     spawnMonsters();
 }
 
-function rollNightEvent() {
-
-    bloodMoon = Math.random() < 0.15;
-    fogNight = Math.random() < 0.25;
-
-    const eventText =
-        document.getElementById("eventText");
-
-    if (bloodMoon) {
-
-        eventText.innerText = "BLOOD MOON";
-        eventText.style.color = "#ff0000";
-
-    } else if (fogNight) {
-
-        eventText.innerText = "HEAVY FOG";
-        eventText.style.color = "#cccccc";
-
-    } else {
-
-        eventText.innerText = "";
-    }
-}
-
-function spawnMonsters() {
+function spawnMonsters(){
 
     monsters = [];
 
-    let count = bloodMoon ? 40 : 20;
-
-    for (let i = 0; i < count; i++) {
+    for(let i = 0; i < 20; i++){
 
         monsters.push({
-
-            x: (Math.random() - 0.5) * 3000,
-            y: (Math.random() - 0.5) * 3000,
-
-            speed:
-                bloodMoon
-                ? 2.5 + Math.random()
-                : 1.2 + Math.random() * 0.8,
-
-            type:
-                Math.random() < 0.2
-                ? "fast"
-                : "normal"
+            x:(Math.random()-0.5)*3000,
+            y:(Math.random()-0.5)*3000,
+            speed:1.2 + Math.random()*0.8
         });
     }
 }
@@ -285,26 +209,25 @@ function spawnMonsters() {
 
 setInterval(() => {
 
-    if (gameOver) return;
+    if(gameOver) return;
 
     timeRemaining--;
 
-    if (timeRemaining <= 0) {
+    if(timeRemaining <= 0){
 
         isDaytime = !isDaytime;
         timeRemaining = 30;
 
-        if (!isDaytime) {
+        if(!isDaytime){
 
             currentNight++;
 
-            rollNightEvent();
             spawnMonsters();
 
             document.getElementById("ui").innerText =
                 "NIGHT " + currentNight + " / 99";
 
-        } else {
+        }else{
 
             document.getElementById("ui").innerText =
                 "DAYTIME - SAFE";
@@ -314,32 +237,12 @@ setInterval(() => {
     document.getElementById("timer").innerText =
         `Time until ${isDaytime ? "Night" : "Day"}: ${timeRemaining}s`;
 
-}, 1000);
+},1000);
 
 // ================= INPUT =================
 
 window.addEventListener("keydown", e => {
-
     keys[e.key.toLowerCase()] = true;
-
-    if (e.key.toLowerCase() === "f") {
-
-        if (batteryPacks > 0 &&
-            flashlightBattery < 100) {
-
-            batteryPacks--;
-            flashlightBattery = 100;
-        }
-    }
-
-    if (e.key.toLowerCase() === "q") {
-
-        if (medkits > 0) {
-
-            medkits--;
-            stamina = 100;
-        }
-    }
 });
 
 window.addEventListener("keyup", e => {
@@ -356,11 +259,11 @@ window.addEventListener("mousemove", e => {
 
 window.addEventListener("mousedown", () => {
 
-    if (gameOver) return;
-    if (isDaytime) return;
-    if (reloading) return;
+    if(gameOver) return;
+    if(isDaytime) return;
+    if(reloading) return;
 
-    if (ammo <= 0) {
+    if(ammo <= 0){
 
         startReload();
         return;
@@ -369,35 +272,38 @@ window.addEventListener("mousedown", () => {
     ammo--;
 
     darts.push({
-        x: player.x,
-        y: player.y,
-        angle: player.angle,
-        speed: 12,
-        life: 100
+        x:player.x,
+        y:player.y,
+        angle:player.angle,
+        speed:12,
+        life:100
     });
 
-    if (ammo <= 0) {
+    if(ammo <= 0){
         startReload();
     }
 });
 
-function startReload() {
+function startReload(){
 
-    if (reloading) return;
+    if(reloading) return;
 
     reloading = true;
+
+    document.getElementById("ammo").innerText =
+        "Reloading...";
 
     setTimeout(() => {
 
         ammo = MAX_AMMO;
         reloading = false;
 
-    }, 5000);
+    },5000);
 }
 
 // ================= RESET =================
 
-function resetGame() {
+function resetGame(){
 
     gameOver = true;
 
@@ -413,18 +319,21 @@ function resetGame() {
         flashlightBattery = 100;
         ammo = 5;
 
+        player.x = canvas.width / 2;
+        player.y = canvas.height / 2;
+
         generateWorld();
 
         gameOver = false;
 
-    }, 10);
+    },10);
 }
 
 // ================= UPDATE =================
 
-function update() {
+function update(){
 
-    if (gameOver) return;
+    if(gameOver) return;
 
     // ===== SPRINT =====
 
@@ -434,11 +343,11 @@ function update() {
     let speed =
         sprinting ? 5.5 : 3;
 
-    if (sprinting) {
+    if(sprinting){
 
         stamina -= 0.6;
 
-    } else {
+    }else{
 
         stamina += 0.3;
     }
@@ -451,11 +360,11 @@ function update() {
 
     // ===== BATTERY =====
 
-    if (!isDaytime) {
+    if(!isDaytime){
 
         flashlightBattery -= 0.02;
 
-    } else {
+    }else{
 
         flashlightBattery += 0.05;
     }
@@ -468,16 +377,16 @@ function update() {
 
     // ===== MOVEMENT =====
 
-    let dx = 0;
-    let dy = 0;
+    let moveX = 0;
+    let moveY = 0;
 
-    if (keys["w"]) dy -= speed;
-    if (keys["s"]) dy += speed;
-    if (keys["a"]) dx -= speed;
-    if (keys["d"]) dx += speed;
+    if(keys["w"]) moveY -= speed;
+    if(keys["s"]) moveY += speed;
+    if(keys["a"]) moveX -= speed;
+    if(keys["d"]) moveX += speed;
 
-    player.x += dx;
-    player.y += dy;
+    player.x += moveX;
+    player.y += moveY;
 
     player.angle =
         Math.atan2(
@@ -485,9 +394,34 @@ function update() {
             mouse.x - canvas.width / 2
         );
 
+    // ===== CABIN TIMER =====
+
+    let insideCabin =
+        player.x > cabin.x &&
+        player.x < cabin.x + cabin.width &&
+        player.y > cabin.y &&
+        player.y < cabin.y + cabin.height;
+
+    if(insideCabin){
+
+        player.safeTimer -= 1/60;
+
+    }else{
+
+        player.safeTimer = 5;
+    }
+
+    if(player.safeTimer < 0){
+
+        player.safeTimer = 0;
+    }
+
+    let protectedByCabin =
+        player.safeTimer > 0;
+
     // ===== DARTS =====
 
-    for (let i = darts.length - 1; i >= 0; i--) {
+    for(let i = darts.length - 1; i >= 0; i--){
 
         let d = darts[i];
 
@@ -496,26 +430,26 @@ function update() {
 
         d.life--;
 
-        if (d.life <= 0) {
+        if(d.life <= 0){
 
-            darts.splice(i, 1);
+            darts.splice(i,1);
             continue;
         }
 
-        for (let j = monsters.length - 1; j >= 0; j--) {
+        for(let j = monsters.length - 1; j >= 0; j--){
 
             let m = monsters[j];
 
-            let mx = m.x - d.x;
-            let my = m.y - d.y;
+            let dx = m.x - d.x;
+            let dy = m.y - d.y;
 
             let dist =
-                Math.sqrt(mx * mx + my * my);
+                Math.sqrt(dx*dx + dy*dy);
 
-            if (dist < 10) {
+            if(dist < 10){
 
-                monsters.splice(j, 1);
-                darts.splice(i, 1);
+                monsters.splice(j,1);
+                darts.splice(i,1);
 
                 break;
             }
@@ -524,45 +458,24 @@ function update() {
 
     // ===== MONSTERS =====
 
-    for (let m of monsters) {
+    for(let m of monsters){
 
         let dx = m.x - player.x;
         let dy = m.y - player.y;
 
-        let dist = Math.sqrt(dx * dx + dy * dy);
+        let dist =
+            Math.sqrt(dx*dx + dy*dy);
 
-        // ===== CABIN CHECK =====
+        // DIE ONLY IF NOT PROTECTED
 
-        let insideCabin =
-            player.x > cabin.x &&
-            player.x < cabin.x + cabin.width &&
-            player.y > cabin.y &&
-            player.y < cabin.y + cabin.height;
-
-        // SAFE TIMER
-
-        if (insideCabin) {
-
-            player.safeTimer += 1 / 60;
-
-        } else {
-
-            player.safeTimer = 0;
-        }
-
-        let protectedByCabin =
-            player.safeTimer <= 5;
-
-        // DEATH CHECK
-
-        if (dist < player.size + 6 &&
-            !protectedByCabin) {
+        if(dist < player.size + 6 &&
+           !protectedByCabin){
 
             resetGame();
             return;
         }
 
-        // STOP MONSTERS ENTERING
+        // STOP MONSTERS INSIDE CABIN
 
         let monsterInsideCabin =
             m.x > cabin.x &&
@@ -570,12 +483,12 @@ function update() {
             m.y > cabin.y &&
             m.y < cabin.y + cabin.height;
 
-        if (monsterInsideCabin) {
+        if(monsterInsideCabin){
 
             continue;
         }
 
-        if (isDaytime) continue;
+        if(isDaytime) continue;
 
         let dynamicRange =
             FLASHLIGHT_RANGE *
@@ -583,7 +496,7 @@ function update() {
 
         let isLit = false;
 
-        if (dist < dynamicRange) {
+        if(dist < dynamicRange){
 
             let angleToMonster =
                 Math.atan2(dy, dx);
@@ -591,30 +504,40 @@ function update() {
             let angleDiff =
                 angleToMonster - player.angle;
 
-            while (angleDiff < -Math.PI)
+            while(angleDiff < -Math.PI)
                 angleDiff += Math.PI * 2;
 
-            while (angleDiff > Math.PI)
+            while(angleDiff > Math.PI)
                 angleDiff -= Math.PI * 2;
 
-            if (Math.abs(angleDiff)
-                < FLASHLIGHT_ANGLE_HALF) {
+            if(Math.abs(angleDiff)
+               < FLASHLIGHT_ANGLE_HALF){
 
                 isLit = true;
             }
         }
 
-        if (dist > 0) {
+        if(dist > 0){
 
-            if (isLit) {
+            if(isLit){
 
-                m.x += (dx / dist) * (m.speed * 2.5);
-                m.y += (dy / dist) * (m.speed * 2.5);
+                m.x +=
+                    (dx / dist) *
+                    (m.speed * 2.5);
 
-            } else if (dist < 800) {
+                m.y +=
+                    (dy / dist) *
+                    (m.speed * 2.5);
 
-                m.x -= (dx / dist) * m.speed;
-                m.y -= (dy / dist) * m.speed;
+            }else if(dist < 800){
+
+                m.x -=
+                    (dx / dist) *
+                    m.speed;
+
+                m.y -=
+                    (dy / dist) *
+                    m.speed;
             }
         }
     }
@@ -622,7 +545,8 @@ function update() {
     // ===== UI =====
 
     document.getElementById("stamina").innerText =
-        "Stamina: " + Math.floor(stamina);
+        "Stamina: " +
+        Math.floor(stamina);
 
     document.getElementById("ammo").innerText =
         reloading
@@ -630,26 +554,19 @@ function update() {
         : `Darts: ${ammo} / ${MAX_AMMO}`;
 
     document.getElementById("battery").innerText =
-        "Flashlight Battery: "
-        + Math.floor(flashlightBattery)
-        + "%";
-
-    document.getElementById("inventory").innerText =
-        `Medkits: ${medkits} | Batteries: ${batteryPacks}`;
-
-    let safeLeft =
-        Math.max(
-            0,
-            (5 - player.safeTimer).toFixed(1)
-        );
+        "Flashlight Battery: " +
+        Math.floor(flashlightBattery) +
+        "%";
 
     document.getElementById("safeTimer").innerText =
-        "Cabin Safety: " + safeLeft + "s";
+        "Cabin Safety: " +
+        player.safeTimer.toFixed(1) +
+        "s";
 }
 
 // ================= DRAW =================
 
-function draw() {
+function draw(){
 
     ctx.fillStyle =
         isDaytime
@@ -672,7 +589,7 @@ function draw() {
 
     // ===== FLASHLIGHT =====
 
-    if (!isDaytime) {
+    if(!isDaytime){
 
         let dynamicRange =
             FLASHLIGHT_RANGE *
@@ -718,7 +635,7 @@ function draw() {
 
     // ===== TREES =====
 
-    for (let tree of trees) {
+    for(let tree of trees){
 
         ctx.beginPath();
 
@@ -751,7 +668,7 @@ function draw() {
 
     // ===== DARTS =====
 
-    for (let d of darts) {
+    for(let d of darts){
 
         ctx.beginPath();
 
@@ -770,20 +687,9 @@ function draw() {
 
     // ===== MONSTERS =====
 
-    for (let m of monsters) {
+    for(let m of monsters){
 
-        ctx.shadowBlur = 10;
-
-        if (m.type === "fast") {
-
-            ctx.shadowColor = "#00ffff";
-            ctx.fillStyle = "#00ffff";
-
-        } else {
-
-            ctx.shadowColor = "#ff0000";
-            ctx.fillStyle = "#ff1111";
-        }
+        ctx.fillStyle = "#ff1111";
 
         ctx.beginPath();
         ctx.arc(m.x - 3, m.y, 2, 0, Math.PI * 2);
@@ -792,8 +698,6 @@ function draw() {
         ctx.beginPath();
         ctx.arc(m.x + 3, m.y, 2, 0, Math.PI * 2);
         ctx.fill();
-
-        ctx.shadowBlur = 0;
     }
 
     // ===== PLAYER =====
@@ -809,7 +713,6 @@ function draw() {
     );
 
     ctx.fillStyle = "white";
-
     ctx.fill();
 
     ctx.restore();
@@ -817,7 +720,7 @@ function draw() {
 
 // ================= LOOP =================
 
-function loop() {
+function loop(){
 
     update();
     draw();
