@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>99 Nights in the Forest</title>
+
+<style>
+body {
+    margin: 0;
+    overflow: hidden;
+    background: #020502;
+    font-family: "Courier New", monospace;
+}
+
+canvas {
+    display: block;
+}
+
+#ui {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: #ff3333;
+    font-size: 24px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px black;
+}
+
+#timer {
+    position: absolute;
+    top: 60px;
+    left: 20px;
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px black;
+}
+
+#stamina {
+    position: absolute;
+    top: 95px;
+    left: 20px;
+    color: #00ccff;
+    font-size: 18px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px black;
+}
+
+#ammo {
+    position: absolute;
+    top: 125px;
+    left: 20px;
+    color: #ffff66;
+    font-size: 18px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px black;
+}
+
+#battery {
+    position: absolute;
+    top: 155px;
+    left: 20px;
+    color: #ffee88;
+    font-size: 18px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px black;
+}
+
+#inventory {
+    position: absolute;
+    top: 185px;
+    left: 20px;
+    color: #88ff88;
+    font-size: 18px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px black;
+}
+
+#eventText {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    color: #ff4444;
+    font-size: 28px;
+    font-weight: bold;
+    text-shadow: 2px 2px 8px black;
+}
+
+#instructions {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    background: rgba(0,0,0,0.7);
+    padding: 10px 20px;
+    border-radius: 5px;
+    text-align: center;
+}
+</style>
+</head>
+
+<body>
+
+<div id="ui">NIGHT 1 / 99</div>
+<div id="timer">Time until Day: 30s</div>
+<div id="stamina">Stamina: 100</div>
+<div id="ammo">Darts: 5 / 5</div>
+<div id="battery">Flashlight Battery: 100%</div>
+<div id="inventory">Medkits: 1 | Batteries: 1</div>
+<div id="eventText"></div>
+
+<div id="instructions">
+WASD = Move |
+SHIFT = Sprint |
+Mouse = Aim |
+Click = Shoot |
+F = Use Battery |
+Q = Use Medkit
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+resize();
+
+window.addEventListener("resize", resize);
+
+// ================= GAME =================
+
+let currentNight = 1;
+let isDaytime = false;
+let timeRemaining = 30;
+let gameOver = false;
+
+let bloodMoon = false;
+let fogNight = false;
+
+// ================= PLAYER =================
+
+const player = {
+    x: canvas.width / 2,
+    y: canvas.height / 2,
+    size: 8,
+    angle: 0
+};
+
+// ================= INPUT =================
+
+const keys = {};
+
+const mouse = {
+    x: canvas.width / 2,
+    y: canvas.height / 2
+};
+
+// ================= STAMINA =================
+
+let stamina = 100;
+const MAX_STAMINA = 100;
+
+// ================= FLASHLIGHT =================
+
+let flashlightBattery = 100;
+const MAX_BATTERY = 100;
+
+const FLASHLIGHT_RANGE = 300;
+const FLASHLIGHT_ANGLE_HALF = Math.PI / 6;
+
+// ================= GUN =================
+
+let darts = [];
+
+let ammo = 5;
+const MAX_AMMO = 5;
+
+let reloading = false;
+const RELOAD_TIME = 5000;
+
+// ================= INVENTORY =================
+
+let batteryPacks = 1;
+let medkits = 1;
+
+// ================= WORLD =================
+
+const trees = [];
+let monsters = [];
+let pickups = [];
+
+// ================= CABIN =================
+
+const cabin = {
+    x: 300,
+    y: 300,
+    width: 120,
+    height: 120
+};
+
+// ================= WORLD GENERATION =================
+
+function generateWorld() {
+
+    trees.length = 0;
+
+    for (let i = 0; i < 120; i++) {
+
+        trees.push({
+            x: (Math.random() - 0.5) * 3000,
+            y: (Math.random() - 0.5) * 3000,
+            radius: Math.random() * 15 + 10
+        });
+    }
+
+    spawnMonsters();
+}
+
+function rollNightEvent() {
+
+    bloodMoon = Math.random() < 0.15;
+    fogNight = Math.random() < 0.25;
+
+    const eventText =
+        document.getElementById("eventText");
+
+    if (bloodMoon) {
+
+        eventText.innerText = "BLOOD MOON";
+        eventText.style.color = "#ff0000";
+
+    } else if (fogNight) {
+
+        eventText.innerText = "HEAVY FOG";
+        eventText.style.color = "#bbbbbb";
+
+    } else {
+
+        eventText.innerText = "";
+    }
+}
+
+function spawnMonsters() {
+
+    monsters = [];
+
+    let count = bloodMoon ? 40 : 20;
+
+    for (let i = 0; i < count; i++) {
+
+        monsters.push({
+
+            x: (Math.random() - 0.5) * 3000,
+            y: (Math.random() - 0.5) * 3000,
+
+            speed:
+                bloodMoon
+                ? 2.5 + Math.random()
+                : 1.2 + Math.random() * 0.8,
+
+            type:
+                Math.random() < 0.2
+                ? "fast"
+                : "normal"
+        });
+    }
+
+    pickups = [];
+
+    for (let i = 0; i < 10; i++) {
+
+        pickups.push({
+
+            x: (Math.random() - 0.5) * 2500,
+            y: (Math.random() - 0.5) * 2500,
+
+            type:
+                Math.random() < 0.5
+                ? "battery"
+                : "medkit"
+        });
+    }
+}
+
+// ================= TIMER =================
+
+setInterval(() => {
+
+    if (gameOver) return;
+
+    timeRemaining--;
+
+    if (timeRemaining <= 0) {
+
+        isDaytime = !isDaytime;
+
+        timeRemaining = 30;
+
+        if (!isDaytime) {
+
+            currentNight++;
+
+            rollNightEvent();
+
+            spawnMonsters();
+
+            document.getElementById("ui").innerText =
+                "NIGHT " + currentNight + " / 99";
+
+            document.getElementById("ui").style.color =
+                "#ff3333";
+
+        } else {
+
+            document.getElementById("ui").innerText =
+                "DAYTIME - SAFE";
+
+            document.getElementById("ui").style.color =
+                "#33ff33";
+        }
+    }
+
+    document.getElementById("timer").innerText =
+        `Time until ${isDaytime ? "Night" : "Day"}: ${timeRemaining}s`;
+
+}, 1000);
+
+// ================= INPUT =================
+
+window.addEventListener("keydown", e => {
+
+    keys[e.key.toLowerCase()] = true;
+
+    // USE BATTERY
+
+    if (e.key.toLowerCase() === "f") {
+
+        if (batteryPacks > 0 &&
+            flashlightBattery < 100) {
+
+            batteryPacks--;
+            flashlightBattery = 100;
+        }
+    }
+
+    // USE MEDKIT
+
+    if (e.key.toLowerCase() === "q") {
+
+        if (medkits > 0) {
+
+            medkits--;
+            stamina = 100;
+        }
+    }
+});
+
+window.addEventListener("keyup", e => {
+    keys[e.key.toLowerCase()] = false;
+});
+
+window.addEventListener("mousemove", e => {
+
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+});
+
+// ================= SHOOT =================
+
+window.addEventListener("mousedown", () => {
+
+    if (gameOver) return;
+    if (isDaytime) return;
+    if (reloading) return;
+
+    if (ammo <= 0) {
+
+        startReload();
+        return;
+    }
+
+    ammo--;
+
+    darts.push({
+
+        x: player.x,
+        y: player.y,
+
+        angle: player.angle,
+
+        speed: 12,
+        life: 100
+    });
+
+    if (ammo <= 0) {
+        startReload();
+    }
+});
+
+function startReload() {
+
+    if (reloading) return;
+
+    reloading = true;
+
+    document.getElementById("ammo").innerText =
+        "Reloading...";
+
+    setTimeout(() => {
+
+        ammo = MAX_AMMO;
+        reloading = false;
+
+    }, RELOAD_TIME);
+}
+
+// ================= RESET =================
+
+function resetGame() {
+
+    gameOver = true;
+
+    setTimeout(() => {
+
+        alert("The creatures caught you!");
+
+        currentNight = 1;
+
+        isDaytime = false;
+
+        timeRemaining = 30;
+
+        stamina = 100;
+
+        flashlightBattery = 100;
+
+        ammo = 5;
+
+        generateWorld();
+
+        gameOver = false;
+
+    }, 10);
+}
+
+// ================= UPDATE =================
+
+function update() {
+
+    if (gameOver) return;
+
+    // ===== STAMINA =====
+
+    let sprinting =
+        keys["shift"] && stamina > 0;
+
+    let speed = sprinting ? 5.5 : 3;
+
+    if (sprinting) {
+
+        stamina -= 0.6;
+
+    } else {
+
+        stamina += 0.3;
+    }
+
+    stamina =
+        Math.max(
+            0,
+            Math.min(MAX_STAMINA, stamina)
+        );
+
+    // ===== BATTERY =====
+
+    if (!isDaytime) {
+
+        flashlightBattery -= 0.02;
+
+    } else {
+
+        flashlightBattery += 0.05;
+    }
+
+    flashlightBattery =
+        Math.max(
+            0,
+            Math.min(MAX_BATTERY, flashlightBattery)
+        );
+
+    // ===== MOVEMENT =====
+
+    let dx = 0;
+    let dy = 0;
+
+    if (keys["w"]) dy -= speed;
+    if (keys["s"]) dy += speed;
+    if (keys["a"]) dx -= speed;
+    if (keys["d"]) dx += speed;
+
+    player.x += dx;
+    player.y += dy;
+
+    player.angle =
+        Math.atan2(
+            mouse.y - canvas.height / 2,
+            mouse.x - canvas.width / 2
+        );
+
+    // ===== DARTS =====
+
+    for (let i = darts.length - 1; i >= 0; i--) {
+
+        let d = darts[i];
+
+        d.x += Math.cos(d.angle) * d.speed;
+        d.y += Math.sin(d.angle) * d.speed;
+
+        d.life--;
+
+        if (d.life <= 0) {
+
+            darts.splice(i, 1);
+            continue;
+        }
+
+        for (let j = monsters.length - 1; j >= 0; j--) {
+
+            let m = monsters[j];
+
+            let mx = m.x - d.x;
+            let my = m.y - d.y;
+
+            let dist = Math.sqrt(mx * mx + my * my);
+
+            if (dist < 10) {
+
+                monsters.splice(j, 1);
+                darts.splice(i, 1);
+
+                break;
+            }
+        }
+    }
+
+    // ===== PICKUPS =====
+
+    for (let i = pickups.length - 1; i >= 0; i--) {
+
+        let p = pickups[i];
+
+        let dx = p.x - player.x;
+        let dy = p.y - player.y;
+
+        let dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < 20) {
+
+            if (p.type === "battery") {
+
+                batteryPacks++;
+
+            } else {
+
+                medkits++;
+            }
+
+            pickups.splice(i, 1);
+        }
+    }
+
+    // ===== MONSTERS =====
+
+    for (let m of monsters) {
+
+        let dx = m.x - player.x;
+        let dy = m.y - player.y;
+
+        let dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < player.size + 6) {
+
+            resetGame();
+            return;
+        }
+
+        if (isDaytime) continue;
+
+        let dynamicRange =
+            FLASHLIGHT_RANGE *
+            (flashlightBattery / 100);
+
+        let isLit = false;
+
+        if (dist < dynamicRange) {
+
+            let angleToMonster =
+                Math.atan2(dy, dx);
+
+            let angleDiff =
+                angleToMonster - player.angle;
+
+            while (angleDiff < -Math.PI)
+                angleDiff += Math.PI * 2;
+
+            while (angleDiff > Math.PI)
+                angleDiff -= Math.PI * 2;
+
+            if (Math.abs(angleDiff)
+                < FLASHLIGHT_ANGLE_HALF) {
+
+                isLit = true;
+            }
+        }
+
+        if (dist > 0) {
+
+            if (isLit) {
+
+                m.x += (dx / dist) * (m.speed * 2.5);
+                m.y += (dy / dist) * (m.speed * 2.5);
+
+            } else if (dist < 800) {
+
+                m.x -= (dx / dist) * m.speed;
+                m.y -= (dy / dist) * m.speed;
+            }
+        }
+    }
+
+    // ===== CABIN =====
+
+    if (isDaytime) {
+
+        let insideCabin =
+            player.x > cabin.x &&
+            player.x < cabin.x + cabin.width &&
+            player.y > cabin.y &&
+            player.y < cabin.y + cabin.height;
+
+        if (insideCabin) {
+
+            stamina += 0.8;
+            flashlightBattery += 0.3;
+        }
+    }
+
+    // ===== UI =====
+
+    document.getElementById("stamina").innerText =
+        "Stamina: " + Math.floor(stamina);
+
+    document.getElementById("battery").innerText =
+        "Flashlight Battery: "
+        + Math.floor(flashlightBattery)
+        + "%";
+
+    document.getElementById("inventory").innerText =
+        `Medkits: ${medkits} | Batteries: ${batteryPacks}`;
+
+    if (!reloading) {
+
+        document.getElementById("ammo").innerText =
+            `Darts: ${ammo} / ${MAX_AMMO}`;
+    }
+}
+
+// ================= DRAW =================
+
+function draw() {
+
+    ctx.fillStyle =
+        isDaytime ? "#1a2b1a" : "#020502";
+
+    ctx.fillRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    ctx.save();
+
+    ctx.translate(
+        canvas.width / 2 - player.x,
+        canvas.height / 2 - player.y
+    );
+
+    // ===== FLASHLIGHT =====
+
+    if (!isDaytime) {
+
+        let dynamicRange =
+            FLASHLIGHT_RANGE *
+            (flashlightBattery / 100);
+
+        ctx.beginPath();
+
+        ctx.moveTo(player.x, player.y);
+
+        ctx.arc(
+            player.x,
+            player.y,
+            dynamicRange,
+            player.angle - FLASHLIGHT_ANGLE_HALF,
+            player.angle + FLASHLIGHT_ANGLE_HALF
+        );
+
+        ctx.closePath();
+
+        let gradient =
+            ctx.createRadialGradient(
+                player.x,
+                player.y,
+                10,
+                player.x,
+                player.y,
+                dynamicRange
+            );
+
+        gradient.addColorStop(
+            0,
+            "rgba(255,255,210,0.4)"
+        );
+
+        gradient.addColorStop(
+            1,
+            "rgba(255,255,210,0)"
+        );
+
+        ctx.fillStyle = gradient;
+
+        ctx.fill();
+    }
+
+    // ===== TREES =====
+
+    for (let tree of trees) {
+
+        ctx.beginPath();
+
+        ctx.arc(
+            tree.x,
+            tree.y,
+            tree.radius,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fillStyle =
+            isDaytime
+            ? "#2d4a2d"
+            : "#142414";
+
+        ctx.fill();
+    }
+
+    // ===== CABIN =====
+
+    ctx.fillStyle = "#5a3a1a";
+
+    ctx.fillRect(
+        cabin.x,
+        cabin.y,
+        cabin.width,
+        cabin.height
+    );
+
+    // ===== PICKUPS =====
+
+    for (let p of pickups) {
+
+        ctx.beginPath();
+
+        ctx.arc(
+            p.x,
+            p.y,
+            6,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fillStyle =
+            p.type === "battery"
+            ? "#ffff44"
+            : "#44ff44";
+
+        ctx.fill();
+    }
+
+    // ===== DARTS =====
+
+    for (let d of darts) {
+
+        ctx.beginPath();
+
+        ctx.arc(
+            d.x,
+            d.y,
+            3,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fillStyle = "#66ccff";
+
+        ctx.fill();
+    }
+
+    // ===== MONSTERS =====
+
+    for (let m of monsters) {
+
+        if (isDaytime) {
+
+            ctx.fillStyle = "#3a1a1a";
+
+            ctx.beginPath();
+
+            ctx.arc(
+                m.x,
+                m.y,
+                8,
+                0,
+                Math.PI * 2
+            );
+
+            ctx.fill();
+        }
+
+        ctx.shadowBlur = 10;
+
+        if (m.type === "fast") {
+
+            ctx.shadowColor = "#00ffff";
+            ctx.fillStyle = "#00ffff";
+
+        } else {
+
+            ctx.shadowColor = "#ff0000";
+            ctx.fillStyle = "#ff1111";
+        }
+
+        ctx.beginPath();
+        ctx.arc(m.x - 3, m.y, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(m.x + 3, m.y, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+    }
+
+    // ===== PLAYER =====
+
+    ctx.beginPath();
+
+    ctx.arc(
+        player.x,
+        player.y,
+        player.size,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fillStyle = "white";
+
+    ctx.fill();
+
+    // ===== FOG =====
+
+    if (fogNight && !isDaytime) {
+
+        ctx.fillStyle =
+            "rgba(180,180,180,0.08)";
+
+        for (let i = 0; i < 6; i++) {
+
+            ctx.fillRect(
+                -2000,
+                -2000,
+                5000,
+                5000
+            );
+        }
+    }
+
+    ctx.restore();
+}
+
+// ================= LOOP =================
+
+function loop() {
+
+    update();
+    draw();
+
+    requestAnimationFrame(loop);
+}
+
+generateWorld();
+loop();
+
+</script>
+</body>
+</html>
