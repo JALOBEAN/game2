@@ -26,44 +26,27 @@ canvas{
     font-weight:bold;
 }
 
-#timer{
+#timer,
+#stamina,
+#ammo,
+#battery,
+#safeTimer,
+#health{
     position:absolute;
-    top:60px;
     left:20px;
     color:white;
     font-size:18px;
 }
 
-#stamina{
-    position:absolute;
-    top:90px;
-    left:20px;
-    color:#00ccff;
-    font-size:18px;
-}
+#timer{top:60px;}
+#stamina{top:90px;}
+#ammo{top:120px;}
+#battery{top:150px;}
+#safeTimer{top:180px;}
 
-#ammo{
-    position:absolute;
-    top:120px;
-    left:20px;
-    color:#ffee66;
-    font-size:18px;
-}
-
-#battery{
-    position:absolute;
-    top:150px;
-    left:20px;
-    color:#ffff88;
-    font-size:18px;
-}
-
-#safeTimer{
-    position:absolute;
-    top:180px;
-    left:20px;
-    color:#66ffcc;
-    font-size:18px;
+#health{
+    top:210px;
+    color:#ff6666;
 }
 
 #instructions{
@@ -87,13 +70,14 @@ canvas{
 <div id="ammo">Darts: 5 / 5</div>
 <div id="battery">Flashlight Battery: 100%</div>
 <div id="safeTimer">Cabin Safety: 5s</div>
+<div id="health">Health: 100</div>
 
 <div id="instructions">
 WASD = Move |
 SHIFT = Sprint |
 Mouse = Aim |
 Click = Shoot |
-Cabin protects for 5 seconds
+Cabin heals you slowly
 </div>
 
 <canvas id="gameCanvas"></canvas>
@@ -128,6 +112,8 @@ const player = {
     safeTimer: 5
 };
 
+let cabinCooldown = 0;
+
 // ================= INPUT =================
 
 const keys = {};
@@ -141,6 +127,11 @@ const mouse = {
 
 let stamina = 100;
 const MAX_STAMINA = 100;
+
+// ================= HEALTH =================
+
+let health = 100;
+const MAX_HEALTH = 100;
 
 // ================= FLASHLIGHT =================
 
@@ -163,17 +154,18 @@ let reloading = false;
 
 const trees = [];
 let monsters = [];
+let medkits = [];
 
 // ================= CABIN =================
 
 const cabin = {
-    x: 300,
-    y: 300,
-    width: 150,
-    height: 150
+    x:300,
+    y:300,
+    width:150,
+    height:150
 };
 
-// ================= WORLD =================
+// ================= WORLD GENERATION =================
 
 function generateWorld(){
 
@@ -189,18 +181,33 @@ function generateWorld(){
     }
 
     spawnMonsters();
+    spawnMedkits();
 }
 
 function spawnMonsters(){
 
     monsters = [];
 
-    for(let i = 0; i < 20; i++){
+    for(let i = 0; i < 20 + currentNight * 2; i++){
 
         monsters.push({
             x:(Math.random()-0.5)*3000,
             y:(Math.random()-0.5)*3000,
-            speed:1.2 + Math.random()*0.8
+            speed:1.2 + Math.random()*0.8 + currentNight*0.03
+        });
+    }
+}
+
+function spawnMedkits(){
+
+    medkits = [];
+
+    for(let i = 0; i < 8; i++){
+
+        medkits.push({
+            x:(Math.random()-0.5)*3000,
+            y:(Math.random()-0.5)*3000,
+            size:10
         });
     }
 }
@@ -221,6 +228,12 @@ setInterval(() => {
         if(!isDaytime){
 
             currentNight++;
+
+            if(currentNight > 99){
+
+                alert("YOU SURVIVED 99 NIGHTS");
+                location.reload();
+            }
 
             spawnMonsters();
 
@@ -316,6 +329,7 @@ function resetGame(){
         timeRemaining = 30;
 
         stamina = 100;
+        health = 100;
         flashlightBattery = 100;
         ammo = 5;
 
@@ -360,13 +374,13 @@ function update(){
 
     // ===== BATTERY =====
 
-    if(!isDaytime){
+    if(isDaytime){
 
-        flashlightBattery -= 0.02;
+        flashlightBattery += 0.02;
 
     }else{
 
-        flashlightBattery += 0.05;
+        flashlightBattery -= 0.03;
     }
 
     flashlightBattery =
@@ -394,7 +408,7 @@ function update(){
             mouse.x - canvas.width / 2
         );
 
-    // ===== CABIN TIMER =====
+    // ===== CABIN =====
 
     let insideCabin =
         player.x > cabin.x &&
@@ -402,22 +416,60 @@ function update(){
         player.y > cabin.y &&
         player.y < cabin.y + cabin.height;
 
+    if(cabinCooldown > 0){
+        cabinCooldown -= 1/60;
+    }
+
     if(insideCabin){
 
-        player.safeTimer -= 1/60;
+        health += 0.08;
+
+        health =
+            Math.min(MAX_HEALTH, health);
+
+        if(player.safeTimer > 0){
+
+            player.safeTimer -= 1/60;
+
+        }else{
+
+            cabinCooldown = 10;
+        }
 
     }else{
 
-        player.safeTimer = 5;
-    }
-
-    if(player.safeTimer < 0){
-
-        player.safeTimer = 0;
+        if(cabinCooldown <= 0){
+            player.safeTimer = 5;
+        }
     }
 
     let protectedByCabin =
-        player.safeTimer > 0;
+        insideCabin &&
+        player.safeTimer > 0 &&
+        cabinCooldown <= 0;
+
+    // ===== MEDKITS =====
+
+    for(let i = medkits.length - 1; i >= 0; i--){
+
+        let med = medkits[i];
+
+        let dx = med.x - player.x;
+        let dy = med.y - player.y;
+
+        let dist =
+            Math.sqrt(dx*dx + dy*dy);
+
+        if(dist < 20){
+
+            health += 35;
+
+            health =
+                Math.min(MAX_HEALTH, health);
+
+            medkits.splice(i,1);
+        }
+    }
 
     // ===== DARTS =====
 
@@ -466,16 +518,21 @@ function update(){
         let dist =
             Math.sqrt(dx*dx + dy*dy);
 
-        // DIE ONLY IF NOT PROTECTED
+        // DAMAGE PLAYER
 
         if(dist < player.size + 6 &&
            !protectedByCabin){
 
-            resetGame();
-            return;
+            health -= 0.35;
+
+            if(health <= 0){
+
+                resetGame();
+                return;
+            }
         }
 
-        // STOP MONSTERS INSIDE CABIN
+        // CABIN
 
         let monsterInsideCabin =
             m.x > cabin.x &&
@@ -484,6 +541,9 @@ function update(){
             m.y < cabin.y + cabin.height;
 
         if(monsterInsideCabin){
+
+            m.x += (Math.random()-0.5)*2;
+            m.y += (Math.random()-0.5)*2;
 
             continue;
         }
@@ -562,6 +622,10 @@ function update(){
         "Cabin Safety: " +
         player.safeTimer.toFixed(1) +
         "s";
+
+    document.getElementById("health").innerText =
+        "Health: " +
+        Math.floor(health);
 }
 
 // ================= DRAW =================
@@ -665,6 +729,36 @@ function draw(){
         cabin.width,
         cabin.height
     );
+
+    // ===== MEDKITS =====
+
+    for(let med of medkits){
+
+        ctx.fillStyle = "#ffffff";
+
+        ctx.fillRect(
+            med.x - 8,
+            med.y - 8,
+            16,
+            16
+        );
+
+        ctx.fillStyle = "#ff0000";
+
+        ctx.fillRect(
+            med.x - 2,
+            med.y - 6,
+            4,
+            12
+        );
+
+        ctx.fillRect(
+            med.x - 6,
+            med.y - 2,
+            12,
+            4
+        );
+    }
 
     // ===== DARTS =====
 
